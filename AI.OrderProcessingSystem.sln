@@ -1,0 +1,49 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36623.8
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AI.OrderProcessingSystem.WebApi", "AI.OrderProcessingSystem.WebApi\AI.OrderProcessingSystem.WebApi.csproj", "{1E20025C-FDD9-4F0E-B0BF-ABFBAA11B572}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AI.OrderProcessingSystem.Common", "AI.OrderProcessingSystem.Common\AI.OrderProcessingSystem.Common.csproj", "{9534CB47-AE28-4390-96C9-8651A73376DF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AI.OrderProcessingSystem.Worker", "AI.OrderProcessingSystem.Worker\AI.OrderProcessingSystem.Worker.csproj", "{B95D7D7D-60AD-484B-94BE-1E2E4A506342}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AI.OrderProcessingSystem.Dal", "AI.OrderProcessingSystem.Dal\AI.OrderProcessingSystem.Dal.csproj", "{FF9DACCF-A3D6-40BE-B36F-2ABF4D4D1766}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AI.OrderProcessingSystem.CronJob", "AI.OrderProcessingSystem.CronJob\AI.OrderProcessingSystem.CronJob.csproj", "{54FD9A36-D50A-4EEE-8838-E617470F8F91}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1E20025C-FDD9-4F0E-B0BF-ABFBAA11B572}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1E20025C-FDD9-4F0E-B0BF-ABFBAA11B572}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1E20025C-FDD9-4F0E-B0BF-ABFBAA11B572}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1E20025C-FDD9-4F0E-B0BF-ABFBAA11B572}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9534CB47-AE28-4390-96C9-8651A73376DF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9534CB47-AE28-4390-96C9-8651A73376DF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9534CB47-AE28-4390-96C9-8651A73376DF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9534CB47-AE28-4390-96C9-8651A73376DF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B95D7D7D-60AD-484B-94BE-1E2E4A506342}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B95D7D7D-60AD-484B-94BE-1E2E4A506342}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B95D7D7D-60AD-484B-94BE-1E2E4A506342}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B95D7D7D-60AD-484B-94BE-1E2E4A506342}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FF9DACCF-A3D6-40BE-B36F-2ABF4D4D1766}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FF9DACCF-A3D6-40BE-B36F-2ABF4D4D1766}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FF9DACCF-A3D6-40BE-B36F-2ABF4D4D1766}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FF9DACCF-A3D6-40BE-B36F-2ABF4D4D1766}.Release|Any CPU.Build.0 = Release|Any CPU
+		{54FD9A36-D50A-4EEE-8838-E617470F8F91}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{54FD9A36-D50A-4EEE-8838-E617470F8F91}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{54FD9A36-D50A-4EEE-8838-E617470F8F91}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{54FD9A36-D50A-4EEE-8838-E617470F8F91}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4DCF9E3F-0816-4F0E-89B4-07ADFFE0948C}
+	EndGlobalSection
+EndGlobal
