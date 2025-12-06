@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: orderprocessing-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: SecureP@ssw0rd123
+      POSTGRES_DB: orderprocessing
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - orderprocessing-network
+
+  webapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: orderprocessing-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5115:80"
+      - "7037:443"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=orderprocessing;Username=postgres;Password=SecureP@ssw0rd123
+    networks:
+      - orderprocessing-network
+    volumes:
+      - ./Configuration:/Configuration:ro
+
+volumes:
+  postgres_data:
+
+networks:
+  orderprocessing-network:
+    driver: bridge

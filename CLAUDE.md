@@ -23,31 +23,30 @@ dotnet build AI.OrderProcessingSystem.sln
 
 ### Run the web application
 ```bash
-# Run with HTTPS (default profile)
 cd AI.OrderProcessingSystem.WebApi
 dotnet run --launch-profile https
-# Application will be available at https://localhost:7037 and http://localhost:5115
+# Application runs at https://localhost:7037 and http://localhost:5115
 
-# Run with HTTP only
+# Or with HTTP only
 dotnet run --launch-profile http
-# Application will be available at http://localhost:5115
+# Application runs at http://localhost:5115
 ```
 
 ### Run other projects
 ```bash
-# Common service
+# Common console application
 cd AI.OrderProcessingSystem.Common
 dotnet run
 
-# Worker service
+# Worker console application
 cd AI.OrderProcessingSystem.Worker
 dotnet run
 
-# CronJob service
+# CronJob console application
 cd AI.OrderProcessingSystem.CronJob
 dotnet run
 
-# Dal service
+# Dal console application
 cd AI.OrderProcessingSystem.Dal
 dotnet run
 ```
@@ -68,23 +67,74 @@ dotnet restore AI.OrderProcessingSystem.sln
 
 ## Architecture Notes
 
-### Project Structure
-The solution follows a layered architecture pattern intended for separating concerns:
+### Project Types and Structure
 
-- **Web Layer** (`AI.OrderProcessingSystem.WebApi`): ASP.NET Core MVC application with Controllers, Models, and Views. Uses default routing pattern `{controller=Home}/{action=Index}/{id?}`. Currently implements a basic Home controller.
+- **AI.OrderProcessingSystem.WebApi** (Sdk: Microsoft.NET.Sdk.Web)
+  - ASP.NET Core MVC application with standard template
+  - Controllers: HomeController with Index, Privacy, and Error actions
+  - Models: ErrorViewModel
+  - Middleware: Exception handling, HSTS, HTTPS redirection, static files, routing, authorization
+  - Default route: `{controller=Home}/{action=Index}/{id?}`
+  - Launch URLs configured in launchSettings.json
+  - May reference all projects except: AI.OrderProcessingSystem.Worker, AI.OrderProcessingSystem.CronJob
 
-- **Common Layer** (`AI.OrderProcessingSystem.Common`): Console application placeholder intended for shared utilities, helpers, constants, and common code used across multiple projects.
+- **AI.OrderProcessingSystem.Common** (Sdk: Microsoft.NET.Sdk, OutputType: Exe)
+  - Console application placeholder
+  - Currently contains only "Hello, World!" implementation
+  - Intended for shared utilities, helpers, and common code
+  - May be referenced by all other projects.
+  - Must not reference any other project.
 
-- **Data Access Layer** (`AI.OrderProcessingSystem.Dal`): Console application placeholder intended for database repositories, Entity Framework contexts, and data models.
+- **AI.OrderProcessingSystem.Dal** (Sdk: Microsoft.NET.Sdk, OutputType: Exe)
+  - Console application placeholder
+  - Currently contains only "Hello, World!" implementation
+  - Intended for database repositories and data models
+  - May be referenced by all projects except AI.OrderProcessingSystem.Common.
 
-- **Worker Service** (`AI.OrderProcessingSystem.Worker`): Console application placeholder intended for background task processing, message queue consumers, or long-running operations.
+- **AI.OrderProcessingSystem.Worker** (Sdk: Microsoft.NET.Sdk, OutputType: Exe)
+  - Console application placeholder
+  - Currently contains only "Hello, World!" implementation
+  - Intended for background task processing
+  - May reference all projects except: AI.OrderProcessingSystem.WebApi, AI.OrderProcessingSystem.CronJob
 
-- **CronJob Service** (`AI.OrderProcessingSystem.CronJob`): Console application placeholder intended for scheduled/recurring tasks.
+- **AI.OrderProcessingSystem.CronJob** (Sdk: Microsoft.NET.Sdk, OutputType: Exe)
+  - Console application placeholder
+  - Currently contains only "Hello, World!" implementation
+  - Intended for scheduled/recurring tasks
+  - May reference all projects except: AI.OrderProcessingSystem.WebApi, AI.OrderProcessingSystem.Worker
 
-### Key Configuration
-- **Target Framework**: .NET 8.0
-- **Nullable Reference Types**: Enabled across all projects
-- **Implicit Usings**: Enabled globally
+### Configuration
 
-### Current State
-The solution is in early development stage. The WebApi project contains a functional ASP.NET Core MVC template with basic scaffolding. The Common, Dal, Worker, and CronJob projects contain only "Hello, World!" console applications and require proper implementation for their intended purposes.
+All projects share these settings:
+- **Target Framework**: net8.0
+- **Nullable Reference Types**: Enabled
+- **Implicit Usings**: Enabled
+
+Sensitive configuration – secrets.json
+- \Configuration\secrets.json
+- Contains credentials, sensitive keys, tokens, passwords
+- Should be added to .gitignore, but for this project I want to keep in github
+
+Non-sensitive configuration – instance.json
+- \Configuration\instance.json
+- Contains non-sensitive environment parameters like URLs
+- Must be committed to the repository
+
+Configuration Loading Requirement, at application startup, the system must:
+1. Load secrets.json
+2. Load instance.json
+3. Merge them into a single runtime configuration object
+4. Both files must be validated at startup
+
+### Docker Rules
+- A Docker configuration must exist at:
+- Path must be \ (root folader) and must be commited into repository
+
+This directory should contain:
+- Dockerfile
+- docker-compose.yml (if required for DB, queues, Redis, etc.)
+- environment loading references for instance.json and secrets.json
+
+### Current Development State
+
+The WebApi project is a functional ASP.NET Core MVC application with basic scaffolding from the default template. The other four projects (Common, Dal, Worker, CronJob) are currently minimal console applications that output "Hello, World!" and need implementation for their intended purposes.
