@@ -1,0 +1,18 @@
+{
+  "AppSettings": {
+    "ApiTitle": "Order Processing API",
+    "ApiVersion": "v1",
+    "ApiDescription": "AI-powered Order Processing System"
+  },
+  "EventProcessingSettings": {
+    "PaymentProcessingDelaySeconds": 5,
+    "OrderCompletionSuccessRate": 0.5,
+    "OrderExpiryThresholdMinutes": 10,
+    "ExpiryCheckIntervalSeconds": 60
+  },
+  "RabbitMqSettings": {
+    "Host": "rabbitmq",
+    "VirtualHost": "/",
+    "Port": 5672
+  }
+}

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AI.OrderProcessingSystem.Common.Configuration;
 using AI.OrderProcessingSystem.Dal.Data;
 using AI.OrderProcessingSystem.WebApi.Configuration;
 using AI.OrderProcessingSystem.WebApi.Services;
@@ -21,15 +22,18 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         .Build();
 
     private string? _testConfigPath;
+    private static readonly object _configFileLock = new object();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Create test configuration files in the solution root
-        CreateTestConfigurationFiles();
-
-        // Set the content root to the solution root where Configuration folder is
+        // Set the content root to the solution root where Configuration folder will be
         var testBinaryPath = AppDomain.CurrentDomain.BaseDirectory;
         var solutionRoot = Path.GetFullPath(Path.Combine(testBinaryPath, "..", "..", "..", ".."));
+
+        // Create test configuration files BEFORE setting content root
+        // This ensures they exist when Program.cs tries to load them
+        CreateTestConfigurationFilesSync(solutionRoot);
+
         builder.UseContentRoot(solutionRoot);
 
         builder.ConfigureServices(services =>
@@ -74,65 +78,125 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
                     ApiTitle = "Test API",
                     ApiVersion = "v1",
                     ApiDescription = "Test API Description"
+                },
+                EventProcessingSettings = new EventProcessingSettings
+                {
+                    PaymentProcessingDelaySeconds = 1,
+                    OrderCompletionSuccessRate = 0.8,
+                    OrderExpiryThresholdMinutes = 5,
+                    ExpiryCheckIntervalSeconds = 30
+                },
+                RabbitMqSettings = new RabbitMqSettings
+                {
+                    Host = "localhost",
+                    VirtualHost = "/",
+                    Port = 5672,
+                    Username = "test",
+                    Password = "test"
                 }
             };
 
             services.AddSingleton(testConfig);
             services.AddSingleton(testConfig.JwtSettings);
+            services.AddSingleton(testConfig.EventProcessingSettings);
+            services.AddSingleton(testConfig.RabbitMqSettings);
 
             // Ensure database is created and migrated
             var sp = services.BuildServiceProvider();
             using var scope = sp.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<OrderProcessingDbContext>();
             db.Database.Migrate();
+
+            // Ensure admin user exists with correct password
+            EnsureAdminUserSeeded(db, testConfig);
         });
     }
 
-    private void CreateTestConfigurationFiles()
+    private static void EnsureAdminUserSeeded(OrderProcessingDbContext context, AppConfiguration config)
     {
-        // Get the test binary directory and go up to find Configuration folder
-        var testBinaryPath = AppDomain.CurrentDomain.BaseDirectory;
-        var projectRoot = Path.GetFullPath(Path.Combine(testBinaryPath, "..", "..", "..", ".."));
-        _testConfigPath = Path.Combine(projectRoot, "Configuration");
-
-        // Ensure Configuration directory exists
-        if (!Directory.Exists(_testConfigPath))
+        var adminUser = context.Users.FirstOrDefault(u => u.Email == config.AdminUser.Email);
+        if (adminUser != null)
         {
-            Directory.CreateDirectory(_testConfigPath);
+            // Update existing admin user password to ensure it matches test expectations
+            adminUser.Password = BCrypt.Net.BCrypt.HashPassword(config.AdminUser.Password);
+            context.SaveChanges();
         }
+    }
 
-        var secretsConfig = new
+    private void CreateTestConfigurationFilesSync(string solutionRoot)
+    {
+        lock (_configFileLock)
         {
-            ConnectionStrings = new { DefaultConnection = _dbContainer.GetConnectionString() },
-            JwtSettings = new
+            _testConfigPath = Path.Combine(solutionRoot, "Configuration");
+
+            // Ensure Configuration directory exists
+            if (!Directory.Exists(_testConfigPath))
             {
-                SecretKey = "test-secret-key-with-minimum-32-characters-for-hs256-algorithm",
-                Issuer = "TestIssuer",
-                Audience = "TestAudience",
-                ExpirationMinutes = 60
-            },
-            AdminUser = new
-            {
-                Email = "admin@orderprocessing.local",
-                Password = "Admin@12345"
+                Directory.CreateDirectory(_testConfigPath);
             }
-        };
 
-        var instanceConfig = new
-        {
-            AppSettings = new
+            var secretsPath = Path.Combine(_testConfigPath, "secrets.json");
+            var instancePath = Path.Combine(_testConfigPath, "instance.json");
+
+            // Only write files if they don't already exist (to avoid file locking issues)
+            if (!File.Exists(secretsPath) || !File.Exists(instancePath))
             {
-                ApiTitle = "Test API",
-                ApiVersion = "v1",
-                ApiDescription = "Test API Description"
+                var secretsConfig = new
+                {
+                    ConnectionStrings = new { DefaultConnection = _dbContainer.GetConnectionString() },
+                    JwtSettings = new
+                    {
+                        SecretKey = "test-secret-key-with-minimum-32-characters-for-hs256-algorithm",
+                        Issuer = "TestIssuer",
+                        Audience = "TestAudience",
+                        ExpirationMinutes = 60
+                    },
+                    AdminUser = new
+                    {
+                        Email = "admin@orderprocessing.local",
+                        Password = "Admin@12345"
+                    },
+                    RabbitMqSettings = new
+                    {
+                        Username = "test",
+                        Password = "test"
+                    }
+                };
+
+                var instanceConfig = new
+                {
+                    AppSettings = new
+                    {
+                        ApiTitle = "Test API",
+                        ApiVersion = "v1",
+                        ApiDescription = "Test API Description"
+                    },
+                    EventProcessingSettings = new
+                    {
+                        PaymentProcessingDelaySeconds = 1,
+                        OrderCompletionSuccessRate = 0.8,
+                        OrderExpiryThresholdMinutes = 5,
+                        ExpiryCheckIntervalSeconds = 30
+                    },
+                    RabbitMqSettings = new
+                    {
+                        Host = "localhost",
+                        VirtualHost = "/",
+                        Port = 5672
+                    }
+                };
+
+                if (!File.Exists(secretsPath))
+                {
+                    File.WriteAllText(secretsPath, JsonSerializer.Serialize(secretsConfig, new JsonSerializerOptions { WriteIndented = true }));
+                }
+
+                if (!File.Exists(instancePath))
+                {
+                    File.WriteAllText(instancePath, JsonSerializer.Serialize(instanceConfig, new JsonSerializerOptions { WriteIndented = true }));
+                }
             }
-        };
-
-        var secretsPath = Path.Combine(_testConfigPath, "secrets.json");
-        var instancePath = Path.Combine(_testConfigPath, "instance.json");
-
-        File.WriteAllText(secretsPath, JsonSerializer.Serialize(secretsConfig, new JsonSerializerOptions { WriteIndented = true }));
-        File.WriteAllText(instancePath, JsonSerializer.Serialize(instanceConfig, new JsonSerializerOptions { WriteIndented = true }));
+        }
     }
 
     public async Task InitializeAsync()

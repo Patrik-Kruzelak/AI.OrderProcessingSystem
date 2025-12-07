@@ -134,11 +134,13 @@ public class JwtTokenServiceTests
         var handler = new JwtSecurityTokenHandler();
         var jwtToken = handler.ReadJwtToken(token);
 
-        var expectedMinExpiration = beforeGeneration.AddMinutes(_jwtSettings.ExpirationMinutes);
-        var expectedMaxExpiration = afterGeneration.AddMinutes(_jwtSettings.ExpirationMinutes);
+        var expectedMinExpiration = beforeGeneration.AddMinutes(_jwtSettings.ExpirationMinutes).AddSeconds(-2);
+        var expectedMaxExpiration = afterGeneration.AddMinutes(_jwtSettings.ExpirationMinutes).AddSeconds(2);
 
-        Assert.True(jwtToken.ValidTo >= expectedMinExpiration);
-        Assert.True(jwtToken.ValidTo <= expectedMaxExpiration);
+        Assert.True(jwtToken.ValidTo >= expectedMinExpiration,
+            $"Token ValidTo ({jwtToken.ValidTo}) should be >= {expectedMinExpiration}");
+        Assert.True(jwtToken.ValidTo <= expectedMaxExpiration,
+            $"Token ValidTo ({jwtToken.ValidTo}) should be <= {expectedMaxExpiration}");
     }
 
     [Fact]

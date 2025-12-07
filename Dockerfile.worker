@@ -1,0 +1,38 @@
+# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copy project files needed for Worker
+COPY AI.OrderProcessingSystem.Worker/AI.OrderProcessingSystem.Worker.csproj AI.OrderProcessingSystem.Worker/
+COPY AI.OrderProcessingSystem.Common/AI.OrderProcessingSystem.Common.csproj AI.OrderProcessingSystem.Common/
+COPY AI.OrderProcessingSystem.Dal/AI.OrderProcessingSystem.Dal.csproj AI.OrderProcessingSystem.Dal/
+
+# Restore dependencies for Worker project only
+RUN dotnet restore AI.OrderProcessingSystem.Worker/AI.OrderProcessingSystem.Worker.csproj
+
+# Copy all source code
+COPY AI.OrderProcessingSystem.Worker AI.OrderProcessingSystem.Worker/
+COPY AI.OrderProcessingSystem.Common AI.OrderProcessingSystem.Common/
+COPY AI.OrderProcessingSystem.Dal AI.OrderProcessingSystem.Dal/
+
+# Build the Worker project
+WORKDIR /src/AI.OrderProcessingSystem.Worker
+RUN dotnet build AI.OrderProcessingSystem.Worker.csproj -c Release -o /app/build
+
+# Publish
+RUN dotnet publish AI.OrderProcessingSystem.Worker.csproj -c Release -o /app/publish /p:UseAppHost=false
+
+# Runtime stage
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+
+# Copy published files
+COPY --from=build /app/publish .
+
+# Copy configuration files
+COPY Configuration /Configuration
+
+# Set environment variables
+ENV DOTNET_ENVIRONMENT=Production
+
+ENTRYPOINT ["dotnet", "AI.OrderProcessingSystem.Worker.dll"]

@@ -1,9 +1,12 @@
 using System.Text;
 using System.Text.Json;
+using AI.OrderProcessingSystem.Common.Abstractions;
+using AI.OrderProcessingSystem.Common.Configuration;
 using AI.OrderProcessingSystem.Dal.Data;
 using AI.OrderProcessingSystem.WebApi.Configuration;
 using AI.OrderProcessingSystem.WebApi.Services;
 using Hellang.Middleware.ProblemDetails;
+using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -12,8 +15,19 @@ using Microsoft.OpenApi.Models;
 var builder = WebApplication.CreateBuilder(args);
 
 // Load configuration files
-var secretsPath = Path.Combine(Directory.GetCurrentDirectory(), "..", "Configuration", "secrets.json");
-var instancePath = Path.Combine(Directory.GetCurrentDirectory(), "..", "Configuration", "instance.json");
+// Check both the standard location and the content root (for test scenarios)
+var currentDir = Directory.GetCurrentDirectory();
+var contentRoot = builder.Environment.ContentRootPath;
+
+var secretsPath = Path.Combine(currentDir, "..", "Configuration", "secrets.json");
+var instancePath = Path.Combine(currentDir, "..", "Configuration", "instance.json");
+
+// If files don't exist in current directory, try content root (for tests)
+if (!File.Exists(secretsPath))
+{
+    secretsPath = Path.Combine(contentRoot, "Configuration", "secrets.json");
+    instancePath = Path.Combine(contentRoot, "Configuration", "instance.json");
+}
 
 if (!File.Exists(secretsPath))
     throw new FileNotFoundException($"Configuration file not found: {secretsPath}");
@@ -32,7 +46,17 @@ var appConfig = new AppConfiguration
                        ?? secretsConfig!["ConnectionStrings"].GetProperty("DefaultConnection").GetString()!,
     JwtSettings = JsonSerializer.Deserialize<JwtSettings>(secretsConfig["JwtSettings"].GetRawText())!,
     AdminUser = JsonSerializer.Deserialize<AdminUserConfig>(secretsConfig["AdminUser"].GetRawText())!,
-    AppSettings = JsonSerializer.Deserialize<AppSettings>(instanceConfig!["AppSettings"].GetRawText())!
+    AppSettings = JsonSerializer.Deserialize<AppSettings>(instanceConfig!["AppSettings"].GetRawText())!,
+    EventProcessingSettings = JsonSerializer.Deserialize<EventProcessingSettings>(
+        instanceConfig["EventProcessingSettings"].GetRawText())!,
+    RabbitMqSettings = new RabbitMqSettings
+    {
+        Host = instanceConfig["RabbitMqSettings"].GetProperty("Host").GetString()!,
+        VirtualHost = instanceConfig["RabbitMqSettings"].GetProperty("VirtualHost").GetString()!,
+        Port = instanceConfig["RabbitMqSettings"].GetProperty("Port").GetInt32(),
+        Username = secretsConfig["RabbitMqSettings"].GetProperty("Username").GetString()!,
+        Password = secretsConfig["RabbitMqSettings"].GetProperty("Password").GetString()!
+    }
 };
 
 // Validate configuration
@@ -40,10 +64,17 @@ if (string.IsNullOrEmpty(appConfig.ConnectionString))
     throw new InvalidOperationException("Database connection string is not configured");
 if (string.IsNullOrEmpty(appConfig.JwtSettings.SecretKey) || appConfig.JwtSettings.SecretKey.Length < 32)
     throw new InvalidOperationException("JWT SecretKey must be at least 32 characters");
+if (string.IsNullOrEmpty(appConfig.RabbitMqSettings.Host))
+    throw new InvalidOperationException("RabbitMQ host is not configured");
+if (appConfig.EventProcessingSettings.OrderCompletionSuccessRate < 0 ||
+    appConfig.EventProcessingSettings.OrderCompletionSuccessRate > 1)
+    throw new InvalidOperationException("OrderCompletionSuccessRate must be between 0 and 1");
 
 // Register configuration
 builder.Services.AddSingleton(appConfig.JwtSettings);
 builder.Services.AddSingleton(appConfig);
+builder.Services.AddSingleton(appConfig.EventProcessingSettings);
+builder.Services.AddSingleton(appConfig.RabbitMqSettings);
 
 // Add DbContext
 builder.Services.AddDbContext<OrderProcessingDbContext>(options =>
@@ -52,6 +83,23 @@ builder.Services.AddDbContext<OrderProcessingDbContext>(options =>
 // Add services
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IPasswordService, PasswordService>();
+builder.Services.AddScoped<IEventPublisher, MassTransitEventPublisher>();
+
+// Add MassTransit with RabbitMQ
+builder.Services.AddMassTransit(x =>
+{
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.Host(appConfig.RabbitMqSettings.Host, appConfig.RabbitMqSettings.VirtualHost, h =>
+        {
+            h.Username(appConfig.RabbitMqSettings.Username);
+            h.Password(appConfig.RabbitMqSettings.Password);
+        });
+
+        // Configure message topology
+        cfg.ConfigureEndpoints(context);
+    });
+});
 
 // Add controllers
 builder.Services.AddControllers();

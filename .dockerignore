@@ -9,3 +9,5 @@
 **/docker-compose.yml
 **/*.md
 **/PRPs
+**/*Tests/
+**/*Tests

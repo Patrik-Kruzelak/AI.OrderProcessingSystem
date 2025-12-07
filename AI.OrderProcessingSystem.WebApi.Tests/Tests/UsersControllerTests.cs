@@ -172,7 +172,7 @@ public class UsersControllerTests : IClassFixture<CustomWebApplicationFactory>
         {
             Name = "Updated Name",
             Email = createdUser!.Email,
-            Password = ""
+            Password = null  // Don't change the password
         };
 
         // Act
@@ -194,7 +194,7 @@ public class UsersControllerTests : IClassFixture<CustomWebApplicationFactory>
         {
             Name = "Updated Name",
             Email = "test@example.com",
-            Password = ""
+            Password = null  // Don't change the password
         };
 
         // Act

@@ -1,4 +1,6 @@
+using AI.OrderProcessingSystem.Common.Abstractions;
 using AI.OrderProcessingSystem.Common.DTOs.Orders;
+using AI.OrderProcessingSystem.Common.Events;
 using AI.OrderProcessingSystem.Dal.Data;
 using AI.OrderProcessingSystem.Dal.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -14,11 +16,16 @@ public class OrdersController : ControllerBase
 {
     private readonly OrderProcessingDbContext _context;
     private readonly ILogger<OrdersController> _logger;
+    private readonly IEventPublisher _eventPublisher;
 
-    public OrdersController(OrderProcessingDbContext context, ILogger<OrdersController> logger)
+    public OrdersController(
+        OrderProcessingDbContext context,
+        ILogger<OrdersController> logger,
+        IEventPublisher eventPublisher)
     {
         _context = context;
         _logger = logger;
+        _eventPublisher = eventPublisher;
     }
 
     [HttpGet]
@@ -104,6 +111,28 @@ public class OrdersController : ControllerBase
 
         _logger.LogInformation("Order created with ID {OrderId}", order.Id);
 
+        // Publish OrderCreatedEvent
+        var orderCreatedEvent = new OrderCreatedEvent
+        {
+            OrderId = order.Id,
+            UserId = order.UserId,
+            Total = order.Total,
+            CreatedAt = order.CreatedAt
+        };
+        await _eventPublisher.PublishAsync(orderCreatedEvent);
+
+        // Create notification
+        var notification = new Notification
+        {
+            OrderId = order.Id,
+            EventType = "OrderCreated",
+            Message = $"Order #{order.Id} created with total ${order.Total:F2}",
+            IsEmailSent = false,
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.Notifications.Add(notification);
+        await _context.SaveChangesAsync();
+
         // Reload with navigation properties
         await _context.Entry(order).Reference(o => o.User).LoadAsync();
         await _context.Entry(order).Collection(o => o.Items).LoadAsync();
@@ -135,12 +164,13 @@ public class OrdersController : ControllerBase
         if (!validStatuses.Contains(dto.Status.ToLower()))
             return BadRequest(new { message = "Invalid order status" });
 
+        var oldStatus = order.Status;
         order.Status = dto.Status.ToLower();
         order.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Order {OrderId} updated", order.Id);
+        _logger.LogInformation("Order {OrderId} updated to status {Status}", order.Id, order.Status);
 
         return Ok(MapToResponseDto(order));
     }

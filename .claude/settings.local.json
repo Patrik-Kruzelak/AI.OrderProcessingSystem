@@ -1,17 +1,24 @@
 {
   "permissions": {
     "allow": [
-      "Bash(test:*)",
+      "Bash(if [ ! -d \"PRPs\" ])",
+      "Bash(then mkdir PRPs)",
+      "Bash(fi)",
       "Bash(dotnet build:*)",
-      "Bash(docker-compose up:*)",
-      "Bash(docker logs:*)",
-      "Bash(docker-compose build:*)",
-      "Bash(curl:*)",
-      "Bash(docker exec:*)",
-      "Bash(dotnet run:*)",
-      "Bash(echo:*)",
+      "Bash(dotnet test:*)",
+      "Bash(if [ -f \"AI.OrderProcessingSystem.Common/Events/OrderExpiredEvent.cs\" ])",
+      "Bash(then echo \"ERROR: OrderExpiredEvent.cs still exists\")",
+      "Bash(else echo \"OK: OrderExpiredEvent.cs deleted\")",
+      "Bash(if [ -f \"AI.OrderProcessingSystem.Worker/Consumers/OrderExpiredConsumer.cs\" ])",
+      "Bash(then echo \"ERROR: OrderExpiredConsumer.cs still exists\")",
+      "Bash(else echo \"OK: OrderExpiredConsumer.cs deleted\")",
       "Bash(cat:*)",
-      "Bash(dotnet test:*)"
+      "Bash(docker-compose up:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker-compose restart:*)",
+      "Bash(docker exec:*)"
     ],
     "deny": [],
     "ask": []

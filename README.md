@@ -1,14 +1,18 @@
 # AI Order Processing System
 
-A complete REST API system for order processing built with .NET 8, PostgreSQL, and Docker.
+A complete event-driven order processing system built with .NET 8, PostgreSQL, RabbitMQ, and Docker.
 
 ## Features
 
 - JWT-based authentication
 - CRUD operations for Users, Products, and Orders
+- **Event-Driven Architecture** with MassTransit and RabbitMQ
+- **Asynchronous Order Processing** with background workers
+- **Automated Order Expiry** with scheduled cron jobs
+- **Email Notifications** for completed orders
 - PostgreSQL database with Entity Framework Core
 - Swagger/OpenAPI documentation
-- Docker containerization
+- Docker containerization with multi-service orchestration
 - Integration tests with Testcontainers
 
 ## Prerequisites
@@ -17,24 +21,46 @@ A complete REST API system for order processing built with .NET 8, PostgreSQL, a
 - Docker and Docker Compose
 - PostgreSQL 16 (if running locally without Docker)
 
+## Architecture Overview
+
+The system uses an event-driven architecture with the following components:
+
+1. **WebApi**: REST API that publishes `OrderCreatedEvent` when orders are created
+2. **Worker**: Consumes events from RabbitMQ and processes orders asynchronously
+   - Consumes `OrderCreatedEvent` → processes payment → publishes `OrderCompletedEvent` or leaves in "processing"
+   - Consumes `OrderCompletedEvent` → sends email notification
+   - Consumes `OrderExpiredEvent` → saves expiry notification
+3. **CronJob**: Scheduled service that checks for expired orders every 60 seconds
+   - Finds orders stuck in "pending" or "processing" for >10 minutes
+   - Updates status to "expired"
+   - Publishes `OrderExpiredEvent`
+4. **RabbitMQ**: Message broker for event distribution
+5. **PostgreSQL**: Relational database for persistent storage
+
 ## Quick Start
 
-### 1. Start the Database and API with Docker Compose
+### 1. Start All Services with Docker Compose
 
 ```bash
 # From repository root
 docker-compose up -d
 ```
 
-This will:
-- Start PostgreSQL on port 5432
-- Build and start the WebApi on ports 5115 (HTTP) and 7037 (HTTPS)
+This will start:
+- **PostgreSQL** on port 5432
+- **RabbitMQ** on ports 5672 (AMQP) and 15672 (Management UI)
+- **WebApi** on ports 5115 (HTTP) and 7037 (HTTPS)
+- **Worker** (background service)
+- **CronJob** (scheduled task service)
 - Automatically run migrations and seed data
 
-### 2. Access the API
+### 2. Access the Services
 
 - **Swagger UI**: http://localhost:5115/swagger
-- **Base URL**: http://localhost:5115/api
+- **API Base URL**: http://localhost:5115/api
+- **RabbitMQ Management UI**: http://localhost:15672
+  - Username: `guest`
+  - Password: `guest`
 
 ### 3. Login with Admin Account
 
@@ -147,16 +173,46 @@ All endpoints except `/api/auth/login` require JWT authentication.
 
 Configuration is split into two files in the `\Configuration` directory:
 
-- **secrets.json**: Database credentials, JWT secret, admin password (committed to Git per requirements)
-- **instance.json**: Non-sensitive settings like API title, URLs, etc.
+- **secrets.json**: Database credentials, JWT secret, RabbitMQ credentials, admin password (committed to Git per requirements)
+- **instance.json**: Non-sensitive settings like:
+  - API title and version
+  - RabbitMQ host and port
+  - Event processing settings (delays, success rates, expiry thresholds)
+
+## Event Flow
+
+### Order Creation
+1. User creates order via `POST /api/orders`
+2. WebApi saves order with status "pending"
+3. WebApi publishes `OrderCreatedEvent` to RabbitMQ
+4. Worker consumes event and processes payment (simulated 5 second delay)
+5. **On Success (50% probability)**:
+   - Worker updates order status to "completed"
+   - Worker publishes `OrderCompletedEvent`
+   - Worker consumes `OrderCompletedEvent` and sends email notification
+6. **On Failure (50% probability)**:
+   - Order remains in "processing" status
+   - Will be expired by CronJob after 10 minutes
+
+### Order Expiry
+1. CronJob runs every 60 seconds
+2. Finds orders in "pending" or "processing" status older than 10 minutes
+3. Updates order status to "expired"
+4. Publishes `OrderExpiredEvent` to RabbitMQ
+5. Worker consumes event and saves notification (no email sent)
 
 ## Project Structure
 
 - **AI.OrderProcessingSystem.WebApi**: REST API with controllers and JWT authentication
 - **AI.OrderProcessingSystem.Dal**: Data Access Layer with EF Core entities and DbContext
-- **AI.OrderProcessingSystem.Common**: Shared DTOs, enums, and constants
-- **AI.OrderProcessingSystem.Worker**: Background worker (not used in this phase)
-- **AI.OrderProcessingSystem.CronJob**: Scheduled tasks (not used in this phase)
+- **AI.OrderProcessingSystem.Common**: Shared utilities, events, and configuration
+  - Events: `OrderCreatedEvent`, `OrderCompletedEvent`, `OrderExpiredEvent`
+  - Abstractions: `IEventPublisher`
+  - Configuration: Settings models
+- **AI.OrderProcessingSystem.Worker**: Background worker service for event consumption
+  - Consumers: `OrderCreatedConsumer`, `OrderCompletedConsumer`, `OrderExpiredConsumer`
+- **AI.OrderProcessingSystem.CronJob**: Scheduled task service for order expiry
+  - Services: `OrderExpiryService`
 - **AI.OrderProcessingSystem.WebApi.Tests**: Integration tests
 
 ## Troubleshooting
@@ -170,9 +226,30 @@ dotnet ef database update --startup-project ../AI.OrderProcessingSystem.WebApi
 
 **Docker issues**:
 ```bash
-# Rebuild containers
+# Rebuild all containers
 docker-compose down -v
 docker-compose up --build
+```
+
+**View service logs**:
+```bash
+# View all logs
+docker-compose logs -f
+
+# View specific service logs
+docker logs orderprocessing-api
+docker logs orderprocessing-worker
+docker logs orderprocessing-cronjob
+docker logs orderprocessing-rabbitmq
+```
+
+**Check order processing**:
+```bash
+# Check orders in database
+docker exec orderprocessing-db psql -U postgres -d orderprocessing -c "SELECT id, status, created_at, updated_at FROM orders ORDER BY id DESC LIMIT 10;"
+
+# Check notifications
+docker exec orderprocessing-db psql -U postgres -d orderprocessing -c "SELECT id, order_id, event_type, is_email_sent FROM notifications ORDER BY id DESC LIMIT 10;"
 ```
 
 **Port conflicts**:

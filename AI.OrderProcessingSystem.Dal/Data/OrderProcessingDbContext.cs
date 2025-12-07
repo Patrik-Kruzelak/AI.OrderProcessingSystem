@@ -14,6 +14,7 @@ public class OrderProcessingDbContext : DbContext
     public DbSet<Product> Products { get; set; }
     public DbSet<Order> Orders { get; set; }
     public DbSet<OrderItem> OrderItems { get; set; }
+    public DbSet<Notification> Notifications { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -81,6 +82,28 @@ public class OrderProcessingDbContext : DbContext
             // Check constraints
             entity.HasCheckConstraint("CK_OrderItem_Quantity", "quantity > 0");
             entity.HasCheckConstraint("CK_OrderItem_Price", "price > 0");
+        });
+
+        // Notification configuration
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.Property(e => e.EventType).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Message).IsRequired();
+            entity.Property(e => e.IsEmailSent).IsRequired();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Foreign key
+            entity.HasOne(e => e.Order)
+                .WithMany()
+                .HasForeignKey(e => e.OrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Check constraint for event type
+            entity.HasCheckConstraint("CK_Notification_EventType",
+                "event_type IN ('OrderCreated', 'OrderCompleted', 'OrderExpired')");
+
+            // Index for querying by order
+            entity.HasIndex(e => e.OrderId);
         });
 
         // Seed data - hash generated for password "Admin@12345"

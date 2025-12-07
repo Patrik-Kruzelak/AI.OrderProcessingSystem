@@ -1,3 +1,5 @@
+using AI.OrderProcessingSystem.Common.Configuration;
+
 namespace AI.OrderProcessingSystem.WebApi.Configuration;
 
 public class AppConfiguration
@@ -6,6 +8,8 @@ public class AppConfiguration
     public JwtSettings JwtSettings { get; set; } = new();
     public AdminUserConfig AdminUser { get; set; } = new();
     public AppSettings AppSettings { get; set; } = new();
+    public EventProcessingSettings EventProcessingSettings { get; set; } = new();
+    public RabbitMqSettings RabbitMqSettings { get; set; } = new();
 }
 
 public class AdminUserConfig
